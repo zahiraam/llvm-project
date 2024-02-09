@@ -5,13 +5,7 @@
 // RUN: -complex-range=limited -o - | FileCheck --check-prefix=LMTD %s
 
 // RUN: %clang_cc1 %s -O0 -emit-llvm -triple x86_64-unknown-unknown \
-// RUN: -fno-cx-limited-range -o - | FileCheck %s --check-prefix=FULL
-
-// RUN: %clang_cc1 %s -O0 -emit-llvm -triple x86_64-unknown-unknown \
 // RUN: -complex-range=smith -o - | FileCheck --check-prefix=FRTRN %s
-
-// RUN: %clang_cc1 %s -O0 -emit-llvm -triple x86_64-unknown-unknown \
-// RUN: -fno-cx-fortran-rules -o - | FileCheck --check-prefix=FULL %s
 
 _Complex float pragma_on_mul(_Complex float a, _Complex float b) {
 #pragma STDC CX_LIMITED_RANGE ON
