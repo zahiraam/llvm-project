@@ -1030,11 +1030,17 @@ def fno_cx_fortran_rules : Joined<["-"], "fno-cx-fortran-rules">,
   Group<f_Group>, Visibility<[ClangOption, CC1Option]>,
   HelpText<"Range reduction is disabled for complex arithmetic operations.">;
 
+def fcomplex_arithmetic_EQ : Joined<["-"], "fcomplex-arithmetic=">, Group<f_Group>,
+  Visibility<[ClangOption, CC1Option]>,
+  Values<"full,smith,extend,limited">, NormalizedValuesScope<"LangOptions">,
+  NormalizedValues<["CX_Full", "CX_Smith", "CX_Extend", "CX_Limited"]>;
+
 def complex_range_EQ : Joined<["-"], "complex-range=">, Group<f_Group>,
   Visibility<[CC1Option]>,
-  Values<"full,limited,fortran">, NormalizedValuesScope<"LangOptions">,
-  NormalizedValues<["CX_Full", "CX_Limited", "CX_Fortran"]>,
+  Values<"full,smith,extend,limited">, NormalizedValuesScope<"LangOptions">,
+  NormalizedValues<["CX_Full", "CX_Smith", "CX_Extend", "CX_Limited"]>,
   MarshallingInfoEnum<LangOpts<"ComplexRange">, "CX_Full">;
+
 
 // OpenCL-only Options
 def cl_opt_disable : Flag<["-"], "cl-opt-disable">, Group<opencl_Group>,

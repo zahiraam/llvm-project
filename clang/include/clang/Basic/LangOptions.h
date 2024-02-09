@@ -414,7 +414,31 @@ public:
     IncompleteOnly = 3,
   };
 
-  enum ComplexRangeKind { CX_Full, CX_Limited, CX_Fortran, CX_None };
+  /// Controls for the complex arithmetic range rules.
+  enum ComplexRangeKind {
+    /// Implementation of complex division and multiplication using a call to
+    /// runtime library functions (generally the case, but the BE might
+    /// sometimes replace the library call if it knows enough about the
+    /// potential range of the inputs). Overflow and non-finite values are
+    /// handled.
+    CX_Full,
+
+    /// Implementation of complex division using the Smith algorithm at source
+    /// precision. Overflow is handled.
+    CX_Smith,
+
+    /// Implementation of complex division using algebraic formulas at higher
+    /// precision. Overflow is handled.
+    CX_Extend,
+
+    /// Implementation of complex division and multiplication using algebraic
+    /// formulas at source precision. Overflow and non-finites values are not
+    /// handled.
+    CX_Limited,
+
+    /// No range rule is enabled.
+    CX_None
+  };
 
 public:
   /// The used language standard.
