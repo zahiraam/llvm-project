@@ -17503,8 +17503,8 @@ createTransparentClause(Sema &SemaRef, ASTContext &Ctx, Expr *ImpexTypeArg,
   if (ER.isInvalid())
     return nullptr;
 
-  return new (Ctx) OMPTransparentClause(
-      ER.get(), HelperValStmt, CaptureRegion, StartLoc, LParenLoc, EndLoc);
+  return new (Ctx) OMPTransparentClause(ER.get(), HelperValStmt, CaptureRegion,
+                                        StartLoc, LParenLoc, EndLoc);
 }
 
 OMPClause *SemaOpenMP::ActOnOpenMPTransparentClause(Expr *ImpexTypeArg,
@@ -17540,9 +17540,9 @@ OMPClause *SemaOpenMP::ActOnOpenMPTransparentClause(Expr *ImpexTypeArg,
           << TypedefName;
       return nullptr;
     }
-  return new (getASTContext())
-      OMPTransparentClause(ImpexTypeArg, HelperValStmt, CaptureRegion,
-                          StartLoc, LParenLoc, EndLoc);
+    return new (getASTContext())
+        OMPTransparentClause(ImpexTypeArg, HelperValStmt, CaptureRegion,
+                             StartLoc, LParenLoc, EndLoc);
   }
 
   if (Ty->isEnumeralType())
@@ -17566,10 +17566,6 @@ OMPClause *SemaOpenMP::ActOnOpenMPTransparentClause(Expr *ImpexTypeArg,
           OMPTransparentClause(ImpexTypeArg, HelperValStmt, CaptureRegion,
                                StartLoc, LParenLoc, EndLoc);
     }
-    #if 0
-    SemaRef.Diag(StartLoc, diag::err_omp_transparent_invalid_type) << Ty;
-    return nullptr;
-    #endif
   }
   if (!isNonNegativeIntegerValue(ImpexTypeArg, SemaRef, OMPC_transparent,
                                  /*StrictlyPositive=*/true))
