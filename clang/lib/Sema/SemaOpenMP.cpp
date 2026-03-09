@@ -17494,25 +17494,38 @@ OMPClause *SemaOpenMP::ActOnOpenMPThreadsetClause(OpenMPThreadsetKind Kind,
       OMPThreadsetClause(Kind, KindLoc, StartLoc, LParenLoc, EndLoc);
 }
 
-static OMPClause *createTransparentClause(Sema &SemaRef, ASTContext &Ctx,
-                                          Expr *ImpexTypeArg,
-                                          SourceLocation StartLoc,
-                                          SourceLocation LParenLoc,
-                                          SourceLocation EndLoc) {
+static OMPClause *
+createTransparentClause(Sema &SemaRef, ASTContext &Ctx, Expr *ImpexTypeArg,
+                        Stmt *HelperValStmt, OpenMPDirectiveKind CaptureRegion,
+                        SourceLocation StartLoc, SourceLocation LParenLoc,
+                        SourceLocation EndLoc) {
   ExprResult ER = SemaRef.DefaultLvalueConversion(ImpexTypeArg);
   if (ER.isInvalid())
     return nullptr;
 
-  return new (Ctx) OMPTransparentClause(ER.get(), StartLoc, LParenLoc, EndLoc);
+  return new (Ctx) OMPTransparentClause(
+      ER.get(), HelperValStmt, CaptureRegion, StartLoc, LParenLoc, EndLoc);
 }
 
 OMPClause *SemaOpenMP::ActOnOpenMPTransparentClause(Expr *ImpexTypeArg,
                                                     SourceLocation StartLoc,
                                                     SourceLocation LParenLoc,
                                                     SourceLocation EndLoc) {
+  Stmt *HelperValStmt = nullptr;
+  OpenMPDirectiveKind DKind = DSAStack->getCurrentDirective();
+  OpenMPDirectiveKind CaptureRegion = getOpenMPCaptureRegionForClause(
+      DKind, OMPC_transparent, getLangOpts().OpenMP);
+  if (CaptureRegion != OMPD_unknown &&
+      !SemaRef.CurContext->isDependentContext()) {
+    Expr *ValExpr = SemaRef.MakeFullExpr(ImpexTypeArg).get();
+    llvm::MapVector<const Expr *, DeclRefExpr *> Captures;
+    ValExpr = tryBuildCapture(SemaRef, ValExpr, Captures).get();
+    HelperValStmt = buildPreInits(getASTContext(), Captures);
+  }
   if (!ImpexTypeArg) {
     return new (getASTContext())
-        OMPTransparentClause(ImpexTypeArg, StartLoc, LParenLoc, EndLoc);
+        OMPTransparentClause(ImpexTypeArg, HelperValStmt, CaptureRegion,
+                             StartLoc, LParenLoc, EndLoc);
   }
   QualType Ty = ImpexTypeArg->getType();
 
@@ -17527,14 +17540,15 @@ OMPClause *SemaOpenMP::ActOnOpenMPTransparentClause(Expr *ImpexTypeArg,
           << TypedefName;
       return nullptr;
     }
-    return createTransparentClause(SemaRef, getASTContext(), ImpexTypeArg,
-                                   StartLoc, LParenLoc, EndLoc);
+  return new (getASTContext())
+      OMPTransparentClause(ImpexTypeArg, HelperValStmt, CaptureRegion,
+                          StartLoc, LParenLoc, EndLoc);
   }
 
   if (Ty->isEnumeralType())
     return createTransparentClause(SemaRef, getASTContext(), ImpexTypeArg,
-                                   StartLoc, LParenLoc, EndLoc);
-
+                                   HelperValStmt, CaptureRegion, StartLoc,
+                                   LParenLoc, EndLoc);
   if (Ty->isIntegerType()) {
     if (isNonNegativeIntegerValue(ImpexTypeArg, SemaRef, OMPC_transparent,
                                   /*StrictlyPositive=*/false)) {
@@ -17548,12 +17562,20 @@ OMPClause *SemaOpenMP::ActOnOpenMPTransparentClause(Expr *ImpexTypeArg,
                 static_cast<int64_t>(SemaOpenMP::OpenMPImpexType::OMP_Export))
           SemaRef.Diag(StartLoc, diag::err_omp_transparent_invalid_value);
       }
-      return createTransparentClause(SemaRef, getASTContext(), ImpexTypeArg,
-                                     StartLoc, LParenLoc, EndLoc);
+      return new (getASTContext())
+          OMPTransparentClause(ImpexTypeArg, HelperValStmt, CaptureRegion,
+                               StartLoc, LParenLoc, EndLoc);
     }
+    #if 0
+    SemaRef.Diag(StartLoc, diag::err_omp_transparent_invalid_type) << Ty;
+    return nullptr;
+    #endif
   }
-  SemaRef.Diag(StartLoc, diag::err_omp_transparent_invalid_type) << Ty;
-  return nullptr;
+  if (!isNonNegativeIntegerValue(ImpexTypeArg, SemaRef, OMPC_transparent,
+                                 /*StrictlyPositive=*/true))
+    return nullptr;
+  return new (getASTContext()) OMPTransparentClause(
+      ImpexTypeArg, HelperValStmt, CaptureRegion, StartLoc, LParenLoc, EndLoc);
 }
 
 OMPClause *SemaOpenMP::ActOnOpenMPProcBindClause(ProcBindKind Kind,

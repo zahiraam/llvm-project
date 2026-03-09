@@ -25,6 +25,8 @@ void TestTaskTransparent() {
   omp_impex_t imp;
 #pragma omp task transparent(omp_not_impex)
 #pragma omp task transparent(imp)
+#pragma omp task transparent(a)
+#pragma omp task transparent(a+1)
 
 #pragma omp parallel
   {
@@ -39,78 +41,132 @@ void TestTaskTransparent() {
 }
 #endif
 
-
 // CHECK: FunctionDecl {{.*}} TestTaskTransparent 'void ()'
 // CHECK: OMPTaskDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_not_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: OMPFirstprivateClause
 // CHECK-NEXT: DeclRefExpr {{.*}} 'omp_impex_t':'void **' lvalue Var {{.*}} 'imp' 'omp_impex_t':'void **' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'omp_impex_t':'void **' lvalue Var {{.*}} 'imp' 'omp_impex_t':'void **' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: OMPFirstprivateClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
 // CHECK-NEXT: CapturedStmt
-// CHECK:  OMPTaskDirective
+// CHECK: OMPTaskDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: ImplicitCastExpr {{.*}} 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: OMPFirstprivateClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
 // CHECK-NEXT: CapturedStmt
+// CHECK-NEXT: CapturedDecl
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: BinaryOperator {{.*}} 'int' '+'
+// CHECK-NEXT: ImplicitCastExpr {{.*}} <col:30> 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: IntegerLiteral {{.*}} <col:32> 'int' 1
+// CHECK-NEXT: CapturedStmt
+// CHEC-NEXT: CapturedDecl
 // CHECK: OMPTaskLoopDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskLoopDirective
-// CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
+// CHECK-NEXT:  OMPTransparentClause
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskLoopDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskLoopDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK: CapturedStmt
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskLoopDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskLoopDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
-// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: BinaryOperator {{.*}} 'int' '+'
+// CHECK-NEXT: ImplicitCastExpr {{.*}} 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: IntegerLiteral {{.*}} <col:32> 'int' 1
 // CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr{{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
+/// CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskLoopDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 // CHECK: OMPTaskLoopDirective
 // CHECK-NEXT: OMPTransparentClause
-// CHECK-NEXT: ImplicitCastExpr {{.*}} 'omp_impex_t':'void **' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_export' 'const omp_impex_t':'void **const'
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+// CHECK: OMPTaskLoopDirective
+// CHECK-NEXT: OMPTransparentClause
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
 
