@@ -3862,7 +3862,8 @@ static void reportOriginalDsa(Sema &SemaRef, const DSAStackTy *Stack,
 
 static OpenMPMapClauseKind
 getMapClauseKindFromModifier(OpenMPDefaultmapClauseModifier M,
-                             bool IsAggregateOrDeclareTarget) {
+                             bool IsAggregateOrDeclareTarget,
+                             bool HasConstQualifier) {
   OpenMPMapClauseKind Kind = OMPC_MAP_unknown;
   switch (M) {
   case OMPC_DEFAULTMAP_MODIFIER_alloc:
@@ -3897,13 +3898,40 @@ getMapClauseKindFromModifier(OpenMPDefaultmapClauseModifier M,
     // 1. the implicit behavior for aggregate is tofrom
     // 2. it's a declare target link
     if (IsAggregateOrDeclareTarget) {
-      Kind = OMPC_MAP_tofrom;
+      if (HasConstQualifier)
+          Kind = OMPC_MAP_to;
+      else
+        Kind = OMPC_MAP_tofrom;
       break;
     }
     llvm_unreachable("Unexpected defaultmap implicit behavior");
   }
   assert(Kind != OMPC_MAP_unknown && "Expect map kind to be known");
   return Kind;
+}
+
+static bool hasNoMutableFields(const CXXRecordDecl *RD) {
+  for (const auto *FD : RD->fields()) {
+    if (FD->isMutable())
+      return false;
+    QualType FT = FD->getType();
+    while (FT->isArrayType())
+      FT = FT->getAsArrayTypeUnsafe()->getElementType();
+    if (const auto *NestedRD = FT->getAsCXXRecordDecl())
+      if (!hasNoMutableFields(NestedRD))
+        return false;
+  }
+  return true;
+}
+
+static bool hasConstQualifiedMappingType(QualType T) {
+  while (T->isArrayType())
+    T = T->getAsArrayTypeUnsafe()->getElementType();
+  if (!T.isConstQualified())
+    return false;
+  if (const auto *RD = T->getAsCXXRecordDecl())
+    return hasNoMutableFields(RD);
+  return true;
 }
 
 namespace {
@@ -4128,7 +4156,8 @@ public:
               ImpInfo.Privates.insert(E);
             } else {
               OpenMPMapClauseKind Kind = getMapClauseKindFromModifier(
-                  M, ClauseKind == OMPC_DEFAULTMAP_aggregate || Res);
+                  M, ClauseKind == OMPC_DEFAULTMAP_aggregate || Res,
+                  hasConstQualifiedMappingType(E->getType()));
               ImpInfo.Mappings[ClauseKind][Kind].insert(E);
             }
           }
@@ -4225,7 +4254,8 @@ public:
         OpenMPDefaultmapClauseKind ClauseKind =
             getVariableCategoryFromDecl(SemaRef.getLangOpts(), FD);
         OpenMPMapClauseKind Kind = getMapClauseKindFromModifier(
-            Modifier, /*IsAggregateOrDeclareTarget=*/true);
+            Modifier, /*IsAggregateOrDeclareTarget=*/true,
+            /*HasConstQualifier=*/false);
         ImpInfo.Mappings[ClauseKind][Kind].insert(E);
         return;
       }
