@@ -3899,7 +3899,7 @@ getMapClauseKindFromModifier(OpenMPDefaultmapClauseModifier M,
     // 2. it's a declare target link
     if (IsAggregateOrDeclareTarget) {
       if (HasConstQualifier)
-          Kind = OMPC_MAP_to;
+        Kind = OMPC_MAP_to;
       else
         Kind = OMPC_MAP_tofrom;
       break;
