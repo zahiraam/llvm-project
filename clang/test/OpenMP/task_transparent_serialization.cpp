@@ -11,36 +11,6 @@ extern const omp_impex_t omp_import;
 extern const omp_impex_t omp_export;
 extern const omp_impex_t omp_impex;
 
-template <typename T>
-class TransparentTemplate {
-public:
-  void TestTaskLoopImpex() {
-    #pragma omp taskloop transparent(omp_impex)
-    for (int i = 0; i < 10; ++i) {}
-  }
-};
-
-void TestTaskTransparent() {
-  int a;
-  omp_impex_t imp;
-#pragma omp task transparent(omp_not_impex)
-#pragma omp task transparent(imp)
-#pragma omp task transparent(a)
-#pragma omp task transparent(a+1)
-
-#pragma omp parallel
-  {
-#pragma omp task transparent(omp_export)
-    {
-#pragma omp taskloop transparent(omp_impex)
-      for (int i = 0; i < 5; ++i) {}
-    }
-  }
-  TransparentTemplate<int> obj;
-  obj.TestTaskLoopImpex();
-}
-#endif
-
 // CHECK: FunctionDecl {{.*}} TestTaskTransparent 'void ()'
 // CHECK: OMPTaskDirective
 // CHECK-NEXT: OMPTransparentClause
@@ -169,6 +139,131 @@ void TestTaskTransparent() {
 // CHECK-NEXT: OMPTransparentClause
 // CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
 // CHECK-NEXT: CapturedStmt
+template <typename T>
+class TransparentTemplate {
+public:
+  void TestTaskLoopImpex() {
+    #pragma omp taskloop transparent(omp_impex)
+    for (int i = 0; i < 10; ++i) {}
+  }
+};
+
+void TestTaskTransparent() {
+  int a;
+  omp_impex_t imp;
+#pragma omp task transparent(omp_not_impex)
+#pragma omp task transparent(imp)
+#pragma omp task transparent(a)
+#pragma omp task transparent(a+1)
+
+#pragma omp parallel
+  {
+#pragma omp task transparent(omp_export)
+    {
+#pragma omp taskloop transparent(omp_impex)
+      for (int i = 0; i < 5; ++i) {}
+    }
+  }
+  TransparentTemplate<int> obj;
+  obj.TestTaskLoopImpex();
+}
 
 
+// CHECK: FunctionDecl {{.*}} TestTransparentImplicitFirstprivateOnEnclosingTask1 'void ()'
+
+// outer task (1)
+// CHECK: OMPTaskDirective
+
+// 'a' is firstprivate on outer
+// CHECK-NEXT: OMPFirstprivateClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: CapturedStmt
+
+// inner task (2)
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: ImplicitCastExpr {{.*}} 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: CapturedStmt
+void TestTransparentImplicitFirstprivateOnEnclosingTask1() {
+  int a;
+#pragma omp task                // (1)
+  {
+#pragma omp task transparent(a) // (2)
+    {}
+  }
+}
+
+// CHECK: FunctionDecl {{.*}} TestTransparentImplicitFirstprivateOnEnclosingTask2 'void ()'
+
+// outer task (1)
+// CHECK: OMPTaskDirective
+
+// 'a' is firstprivate on outer task (1)
+// CHECK-NEXT: OMPFirstprivateClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: CapturedStmt
+
+// inner task (2)
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: ImplicitCastExpr {{.*}} 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+
+// 'a' is firstprivate on outer task (2)
+// CHECK-NEXT: OMPFirstprivateClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: CapturedStmt
+
+// inner task (3)
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: BinaryOperator {{.*}} 'int' '+'
+// CHECK-NEXT: ImplicitCastExpr {{.*}} 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: IntegerLiteral {{.*}} 'int' 1
+// CHECK-NEXT: CapturedStmt
+void TestTransparentImplicitFirstprivateOnEnclosingTask2() {
+  int a;
+#pragma omp task                  // (1)
+  {
+#pragma omp task transparent(a)   // (2)
+#pragma omp task transparent(a+1) // (3)
+    {}
+  }
+}
+
+// CHECK: FunctionDecl {{.*}} TestTransparentImplicitFirstprivateOnEnclosingTask3 'void ()'
+
+// outer task (1)
+// CHECK: OMPTaskDirective
+
+// 'a' is firstprivate on outer task (1)
+// CHECK-NEXT: OMPFirstprivateClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: CapturedStmt
+
+// inner task (2)
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: ImplicitCastExpr {{.*}} 'int' <LValueToRValue>
+// CHECK-NEXT: DeclRefExpr {{.*}} 'int' lvalue Var {{.*}} 'a' 'int' refers_to_enclosing_variable_or_capture
+// CHECK-NEXT: CapturedStmt
+
+// inner task (3)
+// CHECK: OMPTaskDirective
+// CHECK-NEXT: OMPTransparentClause
+// CHECK-NEXT: DeclRefExpr {{.*}} 'const omp_impex_t':'void **const' lvalue Var {{.*}} 'omp_impex' 'const omp_impex_t':'void **const'
+// CHECK-NEXT: CapturedStmt
+void TestTransparentImplicitFirstprivateOnEnclosingTask3() {
+  int a;
+#pragma omp task                        // (1)
+  {
+#pragma omp task transparent(a)         // (2)
+#pragma omp task transparent(omp_impex) // (3)
+    {}
+  }
+}
+
+#endif
 
