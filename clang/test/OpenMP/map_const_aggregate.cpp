@@ -6,9 +6,32 @@
 
 // expected-no-diagnostics
 
+// Tests that const-qualified aggregates without mutable members are implicitly
+// mapped as 'to' instead of 'tofrom' under defaultmap(tofrom:aggregate) and
+// explicit map clauses. Structs that have mutable members, or that are
+// non-const, must continue to be mapped 'tofrom'.
+
 struct foo {
   foo(int j) : i(j) {};
   int i;
+};
+
+struct foo_mutable {
+  foo_mutable(int j) : i(j), m(0) {};
+  int i;
+  mutable int m;
+};
+
+struct foo_nested {
+  foo_nested(int j) : inner(j), z(j) {};
+  foo inner;
+  const int z;
+};
+
+struct foo_nested_mutable {
+  foo_nested_mutable(int j) : inner(j), z(j) {};
+  foo_mutable inner; // has mutable member buried inside
+  const int z;
 };
 
 // CHECK: @.offload_maptypes = private unnamed_addr constant [1 x i64] [i64 545]
@@ -17,11 +40,20 @@ struct foo {
 // CHECK: @.offload_maptypes.6 = private unnamed_addr constant [1 x i64] [i64 545]
 // CHECK: @.offload_maptypes.8 = private unnamed_addr constant [1 x i64] [i64 547]
 // CHECK: @.offload_maptypes.10 = private unnamed_addr constant [1 x i64] [i64 545]
-// CHECK: @.offload_maptypes.12 = private unnamed_addr constant [1 x i64] [i64 35]
-// CHECK: @.offload_maptypes.14 = private unnamed_addr constant [2 x i64] [i64 545, i64 547]
+// CHECK: @.offload_maptypes.12 = private unnamed_addr constant [1 x i64] [i64 33]
+// CHECK: @.offload_maptypes.14 = private unnamed_addr constant [1 x i64] [i64 32]
+// CHECK: @.offload_maptypes.16 = private unnamed_addr constant [1 x i64] [i64 33]
+// CHECK: @.offload_maptypes.18 = private unnamed_addr constant [1 x i64] [i64 2]
+// CHECK: @.offload_maptypes.20 = private unnamed_addr constant [1 x i64] [i64 2]
+// CHECK: @.offload_maptypes.22 = private unnamed_addr constant [1 x i64] [i64 2]
+// CHECK: @.offload_maptypes.24 = private unnamed_addr constant [2 x i64] [i64 545, i64 547]
+// CHECK: @.offload_maptypes.26 = private unnamed_addr constant [1 x i64] [i64 545]
 
-// Const struct, no mutable members -> mapped 'to'
+// ---------------------------------------------------------------------------
+// Implicit mapping tests (no explicit map clause, defaultmap governs)
+// ---------------------------------------------------------------------------
 
+// Const struct with no mutable members. Mapped as TO|TARGET_PARAM|IMPLICIT = 545.
 // LABEL: test_const_no_mutable
 // CHECK: store ptr @.offload_maptypes, ptr {{.*}}, align 8
 void test_const_no_mutable() {
@@ -32,8 +64,7 @@ void test_const_no_mutable() {
   }
 }
 
-// Non-const -> mapped 'tofrom'
-
+// Non-const struct. Mapped as TO|FROM|TARGET_PARAM|IMPLICIT = 547.
 // LABEL: define dso_local void @_Z13test_nonconstv
 // CHECK: store ptr @.offload_maptypes.2, ptr {{.*}}, align 8
 void test_nonconst() {
@@ -44,14 +75,7 @@ void test_nonconst() {
   }
 }
 
-struct foo_mutable {
-  foo_mutable(int j) : i(j), m(0) {};
-  int i;
-  mutable int m;
-};
-
-// Const struct with a mutable member -> mapped 'tofrom'
-
+// Const struct with a mutable member. Mapped as TO|FROM|TARGET_PARAM|IMPLICIT = 547.
 // LABEL: define dso_local void @_Z23test_const_with_mutablev
 // CHECK: store ptr @.offload_maptypes.4, ptr {{.*}}, align 8
 void test_const_with_mutable() {
@@ -62,14 +86,8 @@ void test_const_with_mutable() {
   }
 }
 
-struct foo_nested {
-  foo_nested(int j) : inner(j), z(j) {};
-  foo inner;
-  const int z;
-};
-
-// Const struct nested inside another const struct -> mapped 'to'
-
+// Const struct whose members are themselves all const and free of mutable
+// fields. Mapped as TO|TARGET_PARAM|IMPLICIT = 545.
 // LABEL: define dso_local void @_Z17test_const_nestedv() #0 {
 // CHECK: store ptr @.offload_maptypes.6, ptr {{.*}}, align 8
 void test_const_nested() {
@@ -80,15 +98,8 @@ void test_const_nested() {
   }
 }
 
-struct foo_nested_mutable {
-  foo_nested_mutable(int j) : inner(j), z(j) {};
-  foo_mutable inner; // has mutable member buried inside
-  const int z;
-};
-
-// Const struct nested inside another const struct, where the nested
-// struct has a mutable member -> mapped 'tofrom'
-
+// Const array of a const-qualified struct type.
+// Mapped as TO|FROM|TARGET_PARAM|IMPLICIT = 547.
 // LABEL: define dso_local void @_Z30test_const_nested_with_mutablev
 // CHECK: store ptr @.offload_maptypes.8, ptr {{.*}}, align 8
 void test_const_nested_with_mutable() {
@@ -99,8 +110,8 @@ void test_const_nested_with_mutable() {
   }
 }
 
-// Const array of foo -> mapped 'to'
-
+// Const array of a const-qualified struct type.
+// Mapped as TO|TARGET_PARAM|IMPLICIT = 545.
 // LABEL: define dso_local void @_Z16test_const_arrayv
 // CHECK: store ptr @.offload_maptypes.10, ptr {{.*}}, align 8
 void test_const_array() {
@@ -111,11 +122,14 @@ void test_const_array() {
   }
 }
 
-// Explicit map(tofrom:) on a const struct -> mapped 'tofrom'
+// ---------------------------------------------------------------------------
+// Explicit map clause tests
+// ---------------------------------------------------------------------------
 
-// LABEL: define dso_local void @_Z27test_explicit_map_overridesv
+// Explicit map(tofrom:) on a const struct. Mapped as TO|TARGET_PARAM = 33.
+// LABEL: define dso_local void @_Z27test_explicit_tofrom_const
 // CHECK: store ptr @.offload_maptypes.12, ptr {{.*}}, align 8
-void test_explicit_map_overrides() {
+void test_explicit_tofrom_const() {
   const foo a(2);
 #pragma omp target map(tofrom:a)
   {
@@ -123,10 +137,69 @@ void test_explicit_map_overrides() {
   }
 }
 
-// Mixed: const foo (to) and non-const foo (tofrom) in the same region.
-
-// LABEL: define dso_local void @_Z10test_mixedv
+// Explicit map(from:) on a const struct. The FROM clause is ignored.
+// Mapped as TARGET_PARAM = 32.
+// LABEL: define dso_local void @_Z24test_explicit_from_constv
 // CHECK: store ptr @.offload_maptypes.14, ptr {{.*}}, align 8
+void test_explicit_from_const() {
+  const foo a(2);
+#pragma omp target map(from:a)
+  {
+    int x = a.i;
+  }
+}
+
+// Explicit map(to:) on a const struct. Mapped as TO|TARGET_PARAM = 33.
+// LABEL: define dso_local void @_Z22test_explicit_to_constv()
+// CHECK: store ptr @.offload_maptypes.16, ptr {{.*}}, align 8
+void test_explicit_to_const() {
+  const foo a(2);
+#pragma omp target map(to:a)
+  {
+    int x = a.i;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// target update from tests
+// ---------------------------------------------------------------------------
+
+// target update from on a const struct with no mutable members. The FROM clause
+// is ignored. Mapped as FROM = 2.
+// LABEL: define dso_local void @_Z29test_target_update_from_constv
+// CHECK:   call void @__tgt_target_data_update_mapper(ptr @1, i64 -1, i32 1, ptr %3, ptr %4, ptr @.offload_sizes.17, ptr @.offload_maptypes.18, ptr null, ptr null)
+void test_target_update_from_const() {
+  const foo a(2);
+#pragma omp target update from(a)
+}
+
+// target update from on a non-const struct. Mapped as FROM = 2.
+// LABEL: define dso_local void @_Z32test_target_update_from_nonconstv
+// CHECK: call void @__tgt_target_data_update_mapper(ptr @1, i64 -1, i32 1, ptr %3, ptr %4, ptr @.offload_sizes.19, ptr @.offload_maptypes.20, ptr null, ptr null)
+void test_target_update_from_nonconst() {
+  foo a(2);
+#pragma omp target update from(a)
+}
+
+// target update from on a const struct that has a mutable member. Mapped as FROM = 2.
+// LABEL: define dso_local void @_Z37test_target_update_from_const_mutablev
+// CHECK: call void @__tgt_target_data_update_mapper(ptr @1, i64 -1, i32 1, ptr %3, ptr %4, ptr @.offload_sizes.21, ptr @.offload_maptypes.22, ptr null, ptr null)
+
+void test_target_update_from_const_mutable() {
+  const foo_mutable a(2);
+#pragma omp target update from(a)
+}
+
+// ---------------------------------------------------------------------------
+// Combined tests
+// ---------------------------------------------------------------------------
+
+// Mixed region with one const and one non-const variable of the same struct
+// type. Each variable gets its own map type: const maps as
+// TO|TARGET_PARAM|IMPLICIT = 545, non-const maps as
+// TO|FROM|TARGET_PARAM|IMPLICIT = 547.
+// LABEL: define dso_local void @_Z10test_mixedv
+// CHECK: store ptr @.offload_maptypes.24, ptr {{.*}}, align 8
 void test_mixed() {
   const foo ca(2);
   foo ma(3);
@@ -137,10 +210,10 @@ void test_mixed() {
   }
 }
 
-// Defaultmap(tofrom:aggregate) explicit -> mapped 'to'.
-
+// Explicit defaultmap(tofrom:aggregate) directive on a const struct.
+// Mapped as TO|TARGET_PARAM|IMPLICIT = 545.
 // LABEL: define dso_local void @_Z31test_defaultmap_tofrom_explicitv
-// CHECK: store ptr @.offload_maptypes.16, ptr {{.*}}, align 8
+// CHECK: store ptr @.offload_maptypes.26, ptr {{.*}}, align 8
 void test_defaultmap_tofrom_explicit() {
   const foo a(2);
 #pragma omp target defaultmap(tofrom:aggregate)
