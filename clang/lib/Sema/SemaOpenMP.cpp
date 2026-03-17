@@ -3930,6 +3930,12 @@ static bool hasConstQualifiedMappingType(QualType T) {
   if (!T.isConstQualified())
     return false;
   if (const auto *RD = T->getAsCXXRecordDecl())
+    // TODO : Per OpenMP 6.0 p299 lines 3-4, non-mutable members of a
+    // const-qualified struct should also be ignored for 'from'. This
+    // requires per-member mapping granularity via compiler-generated
+    // default mappers and a mechanism to ensure constness to the mapper.
+    // For now we conservatively treat any struct with mutable members as
+    // requiring full 'tofrom'.
     return hasNoMutableFields(RD);
   return true;
 }

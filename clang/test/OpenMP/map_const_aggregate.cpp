@@ -22,6 +22,10 @@ struct foo_mutable {
   mutable int m;
 };
 
+// TODO: A const foo_mutable should ideally only copy back its mutable
+// member 'm' and ignore non-mutable member 'i' on a 'from' mapping, per
+// OpenMP 6.0 p299 lines 3-4. This requires per-member mapper generation
+// and is left for a follow-up patch.
 struct foo_nested {
   foo_nested(int j) : inner(j), z(j) {};
   foo inner;
@@ -48,6 +52,7 @@ struct foo_nested_mutable {
 // CHECK: @.offload_maptypes.22 = private unnamed_addr constant [1 x i64] [i64 2]
 // CHECK: @.offload_maptypes.24 = private unnamed_addr constant [2 x i64] [i64 545, i64 547]
 // CHECK: @.offload_maptypes.26 = private unnamed_addr constant [1 x i64] [i64 545]
+// CHECK: @.offload_maptypes.28 = private unnamed_addr constant [1 x i64] [i64 2]
 
 // ---------------------------------------------------------------------------
 // Implicit mapping tests (no explicit map clause, defaultmap governs)
@@ -184,7 +189,6 @@ void test_target_update_from_nonconst() {
 // target update from on a const struct that has a mutable member. Mapped as FROM = 2.
 // LABEL: define dso_local void @_Z37test_target_update_from_const_mutablev
 // CHECK: call void @__tgt_target_data_update_mapper(ptr @1, i64 -1, i32 1, ptr %3, ptr %4, ptr @.offload_sizes.21, ptr @.offload_maptypes.22, ptr null, ptr null)
-
 void test_target_update_from_const_mutable() {
   const foo_mutable a(2);
 #pragma omp target update from(a)
@@ -220,4 +224,23 @@ void test_defaultmap_tofrom_explicit() {
   {
     int x = a.i;
   }
+}
+
+// User-defined mapper on const struct — FROM must NOT be suppressed because the
+// mapper accesses non-const pointee data py[0:10].
+// Mapped as FROM = 2.
+// LABEL: define dso_local void @_Z30test_user_defined_mapper_constv
+// CHECK: call void @__tgt_target_data_update_mapper(ptr @1, i64 -1, i32 1, ptr {{.*}}, ptr {{.*}}, ptr @.offload_sizes.27, ptr @.offload_maptypes.28, ptr null, ptr {{.*}})
+int y[10];
+struct S {
+  int x;
+  int *py;
+};
+
+#pragma omp declare mapper(m1: const S s) map(alloc: s.x, s.py) map(from: s.py[0:10])
+
+void test_user_defined_mapper_const() {
+  int data[10] = {0};
+  const S s1 = {1, data};
+  #pragma omp target update from(mapper(m1): s1)
 }
