@@ -38,20 +38,20 @@ struct foo_nested_mutable {
   const int z;
 };
 
-// CHECK: @.offload_maptypes = private unnamed_addr constant [1 x i64] [i64 545]
-// CHECK: @.offload_maptypes.2 = private unnamed_addr constant [1 x i64] [i64 547]
-// CHECK: @.offload_maptypes.4 = private unnamed_addr constant [1 x i64] [i64 547]
-// CHECK: @.offload_maptypes.6 = private unnamed_addr constant [1 x i64] [i64 545]
-// CHECK: @.offload_maptypes.8 = private unnamed_addr constant [1 x i64] [i64 547]
-// CHECK: @.offload_maptypes.10 = private unnamed_addr constant [1 x i64] [i64 545]
-// CHECK: @.offload_maptypes.12 = private unnamed_addr constant [1 x i64] [i64 33]
-// CHECK: @.offload_maptypes.14 = private unnamed_addr constant [1 x i64] [i64 32]
-// CHECK: @.offload_maptypes.16 = private unnamed_addr constant [1 x i64] [i64 33]
+// CHECK: @.offload_maptypes = private unnamed_addr constant [2 x i64] [i64 545, i64 288]
+// CHECK: @.offload_maptypes.2 = private unnamed_addr constant [2 x i64] [i64 547, i64 288]
+// CHECK: @.offload_maptypes.4 = private unnamed_addr constant [2 x i64] [i64 547, i64 288]
+// CHECK: @.offload_maptypes.6 = private unnamed_addr constant [2 x i64] [i64 545, i64 288]
+// CHECK: @.offload_maptypes.8 = private unnamed_addr constant [2 x i64] [i64 547, i64 288]
+// CHECK: @.offload_maptypes.10 = private unnamed_addr constant [2 x i64] [i64 545, i64 288]
+// CHECK: @.offload_maptypes.12 = private unnamed_addr constant [2 x i64] [i64 33, i64 288]
+// CHECK: @.offload_maptypes.14 = private unnamed_addr constant [2 x i64] [i64 32, i64 288]
+// CHECK: @.offload_maptypes.16 = private unnamed_addr constant [2 x i64] [i64 33, i64 288]
 // CHECK: @.offload_maptypes.18 = private unnamed_addr constant [1 x i64] [i64 2]
 // CHECK: @.offload_maptypes.20 = private unnamed_addr constant [1 x i64] [i64 2]
 // CHECK: @.offload_maptypes.22 = private unnamed_addr constant [1 x i64] [i64 2]
-// CHECK: @.offload_maptypes.24 = private unnamed_addr constant [2 x i64] [i64 545, i64 547]
-// CHECK: @.offload_maptypes.26 = private unnamed_addr constant [1 x i64] [i64 545]
+// CHECK: @.offload_maptypes.24 = private unnamed_addr constant [3 x i64] [i64 545, i64 547, i64 288]
+// CHECK: @.offload_maptypes.26 = private unnamed_addr constant [2 x i64] [i64 545, i64 288]
 // CHECK: @.offload_maptypes.28 = private unnamed_addr constant [1 x i64] [i64 2]
 
 // ---------------------------------------------------------------------------
