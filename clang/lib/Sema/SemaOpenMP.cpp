@@ -8860,16 +8860,16 @@ calculateNumIters(Sema &SemaRef, Scope *S, SourceLocation DefaultLoc,
   // those correctly.
   if (TestIsStrictOp && InitDependOnLC.has_value() &&
       InitDependOnLC.value() >= 2 && !CondDependOnLC.has_value()) {
-      Diff = SemaRef.BuildBinOp(S, DefaultLoc, BO_Sub, Upper, Lower);
-      if (!Diff.isUsable())
-          return nullptr;
+    Diff = SemaRef.BuildBinOp(S, DefaultLoc, BO_Sub, Upper, Lower);
+    if (!Diff.isUsable())
+        return nullptr;
 
-      Diff = SemaRef.BuildBinOp(S, DefaultLoc, BO_Add, Diff.get(),
-          SemaRef.ActOnIntegerConstant(DefaultLoc, 1).get());
-      if (!Diff.isUsable())
-          return nullptr;
+    Diff = SemaRef.BuildBinOp(S, DefaultLoc, BO_Add, Diff.get(),
+        SemaRef.ActOnIntegerConstant(DefaultLoc, 1).get());
+    if (!Diff.isUsable())
+        return nullptr;
 
-      return Diff.get();
+    return Diff.get();
   }
 
   // If need to reorganize, then calculate the form as Upper - (Lower - Step [+
