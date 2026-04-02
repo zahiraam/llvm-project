@@ -8862,12 +8862,13 @@ calculateNumIters(Sema &SemaRef, Scope *S, SourceLocation DefaultLoc,
       InitDependOnLC.value() >= 2 && !CondDependOnLC.has_value()) {
     Diff = SemaRef.BuildBinOp(S, DefaultLoc, BO_Sub, Upper, Lower);
     if (!Diff.isUsable())
-        return nullptr;
+      return nullptr;
 
-    Diff = SemaRef.BuildBinOp(S, DefaultLoc, BO_Add, Diff.get(),
-        SemaRef.ActOnIntegerConstant(DefaultLoc, 1).get());
+    Diff =
+        SemaRef.BuildBinOp(S, DefaultLoc, BO_Add, Diff.get(),
+                           SemaRef.ActOnIntegerConstant(DefaultLoc, 1).get());
     if (!Diff.isUsable())
-        return nullptr;
+      return nullptr;
 
     return Diff.get();
   }
