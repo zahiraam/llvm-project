@@ -2162,8 +2162,7 @@ void CodeGenFunction::EmitOMPParallelDirective(const OMPParallelDirective &S) {
 /// Used for runtime metadirective selection.
 static void EmitOMPDirectiveWithBody(CodeGenFunction &CGF,
                                      OpenMPDirectiveKind DKind,
-                                     const Stmt *Body,
-                                     SourceLocation Loc) {
+                                     const Stmt *Body, SourceLocation Loc) {
   auto &RT = CGF.CGM.getOpenMPRuntime();
 
   switch (DKind) {
@@ -2205,8 +2204,7 @@ static void EmitOMPDirectiveWithBody(CodeGenFunction &CGF,
     // Emit call to __kmpc_fork_call(loc, 0, outlined_fn).
     llvm::Value *RTLoc = RT.emitUpdateLocation(CGF, Loc);
     llvm::Value *ForkCallArgs[] = {
-        RTLoc,
-        CGF.Builder.getInt32(0),
+        RTLoc, CGF.Builder.getInt32(0),
         CGF.Builder.CreateBitCast(OutlinedFn,
                                   llvm::PointerType::getUnqual(Ctx))};
 

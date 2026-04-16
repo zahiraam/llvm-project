@@ -6406,7 +6406,7 @@ public:
   Stmt *getIfStmt() const { return IfStmt; }
 
   void setNonConstantUserConditions(ArrayRef<Expr *> Conds,
-                                     ArrayRef<OpenMPDirectiveKind> Variants) {
+                                    ArrayRef<OpenMPDirectiveKind> Variants) {
     HasNonConstantConditions = true;
     NumConditions = Conds.size();
     Conditions = const_cast<Expr **>(Conds.data());
