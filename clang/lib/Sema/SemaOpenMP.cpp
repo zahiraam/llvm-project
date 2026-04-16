@@ -7953,6 +7953,17 @@ setBranchProtectedScope(Sema &SemaRef, OpenMPDirectiveKind DKind, Stmt *AStmt) {
   return CS;
 }
 
+StmtResult SemaOpenMP::ActOnOpenMPMetaDirective(ArrayRef<OMPClause *> Clauses,
+                                                Stmt *AStmt,
+                                                SourceLocation StartLoc,
+                                                SourceLocation EndLoc) {
+  if (!AStmt)
+    return StmtError();
+
+  return OMPMetaDirective::Create(getASTContext(), StartLoc, EndLoc, Clauses,
+                                  AStmt, /*IfStmt=*/nullptr);
+}
+
 StmtResult
 SemaOpenMP::ActOnOpenMPParallelDirective(ArrayRef<OMPClause *> Clauses,
                                          Stmt *AStmt, SourceLocation StartLoc,

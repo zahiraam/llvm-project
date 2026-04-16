@@ -6377,6 +6377,14 @@ class OMPMetaDirective final : public OMPExecutableDirective {
   friend class OMPExecutableDirective;
   Stmt *IfStmt;
 
+  // Runtime selection support for non-constant user conditions.
+  // These fields store metadata for generating runtime if-else chains when
+  // user conditions cannot be evaluated at compile time.
+  bool HasNonConstantConditions = false;
+  unsigned NumConditions = 0;
+  Expr **Conditions = nullptr;
+  OpenMPDirectiveKind *DirectiveVariants = nullptr;
+
   OMPMetaDirective(SourceLocation StartLoc, SourceLocation EndLoc)
       : OMPExecutableDirective(OMPMetaDirectiveClass,
                                llvm::omp::OMPD_metadirective, StartLoc,
@@ -6396,6 +6404,22 @@ public:
   static OMPMetaDirective *CreateEmpty(const ASTContext &C, unsigned NumClauses,
                                        EmptyShell);
   Stmt *getIfStmt() const { return IfStmt; }
+
+  void setNonConstantUserConditions(ArrayRef<Expr *> Conds,
+                                     ArrayRef<OpenMPDirectiveKind> Variants) {
+    HasNonConstantConditions = true;
+    NumConditions = Conds.size();
+    Conditions = const_cast<Expr **>(Conds.data());
+    DirectiveVariants = const_cast<OpenMPDirectiveKind *>(Variants.data());
+  }
+
+  bool hasNonConstantConditions() const { return HasNonConstantConditions; }
+  ArrayRef<Expr *> getConditions() const {
+    return llvm::ArrayRef(Conditions, NumConditions);
+  }
+  ArrayRef<OpenMPDirectiveKind> getDirectiveVariants() const {
+    return llvm::ArrayRef(DirectiveVariants, NumConditions);
+  }
 
   static bool classof(const Stmt *T) {
     return T->getStmtClass() == OMPMetaDirectiveClass;
