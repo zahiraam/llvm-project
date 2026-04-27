@@ -2671,108 +2671,23 @@ StmtResult Parser::ParseOpenMPDeclarativeOrExecutableDirective(
     TPA.Revert();
     // End of the first iteration. Parser is reset to the start of metadirective
 
-    // Check if we have non-constant user conditions.
-    bool HasNonConstantUserCondition = false;
-    for (unsigned i = 0; i < TraitInfos.size(); ++i) {
-      if (ClauseKinds[i] == OMPC_when) {
-        OMPTraitInfo *TI = TraitInfos[i];
-        TI->anyScoreOrCondition([&](Expr *&E, bool IsScore) {
-          if (!IsScore && E && !E->isIntegerConstantExpr(ASTContext)) {
-            HasNonConstantUserCondition = true;
-            return true;
-          }
-          return false;
-        });
-        if (HasNonConstantUserCondition)
-          break;
-      }
+    // Detect non-constant user conditions.
+    bool NeedsRuntimeSelection  = false;
+    for (unsigned I = 0; I < TraitInfos.size(); ++I) {
+      if (ClauseKinds[I] != OMPC_when)
+        continue;
+      TraitInfos[I]->anyScoreOrCondition([&](Expr *&E, bool IsScore) {
+        if (!IsScore && E && !E->isIntegerConstantExpr(ASTContext)) {
+          NeedsRuntimeSelection  = true;
+          return true;
+        }
+        return false;
+      });
+      if (NeedsRuntimeSelection )
+        break;
     }
-    if (HasNonConstantUserCondition) {
-      // Extract directive kinds and conditions.
-      SmallVector<Expr *, 4> Conditions;
-      SmallVector<OpenMPDirectiveKind, 4> DirectiveKinds;
 
-      while (Tok.isNot(tok::annot_pragma_openmp_end)) {
-        OpenMPClauseKind CKind = Tok.isAnnotation()
-                                     ? OMPC_unknown
-                                     : getOpenMPClauseKind(PP.getSpelling(Tok));
-        SourceLocation ClauseLoc = ConsumeToken();
-        T.consumeOpen();
-
-        Expr *Condition = nullptr;
-        if (CKind == OMPC_when) {
-          OMPTraitInfo &TI = Actions.getASTContext().getNewOMPTraitInfo();
-          parseOMPContextSelectors(ClauseLoc, TI);
-
-          // Extract the user condition expression.
-          TI.anyScoreOrCondition([&](Expr *&E, bool IsScore) {
-            if (!IsScore && E) {
-              Condition = E;
-              return true;
-            }
-            return false;
-          });
-
-          ConsumeAnyToken(); // consume ':'.
-        }
-
-        OpenMPDirectiveKind DKind = OMPD_unknown;
-        if (!Tok.is(tok::r_paren)) {
-          DKind = parseOpenMPDirectiveKind(*this);
-        }
-
-        Conditions.push_back(Condition);
-        DirectiveKinds.push_back(DKind);
-        // Skip to closing paren.
-        int paren = 0;
-        while (Tok.isNot(tok::r_paren) || paren != 0) {
-          if (Tok.is(tok::l_paren))
-            paren++;
-          if (Tok.is(tok::r_paren))
-            paren--;
-          if (Tok.is(tok::annot_pragma_openmp_end))
-            break;
-          ConsumeAnyToken();
-        }
-        if (Tok.is(tok::r_paren))
-          T.consumeClose();
-      }
-      // Consume end token and parse body once.
-      assert(Tok.is(tok::annot_pragma_openmp_end));
-      SourceLocation EndLoc = ConsumeAnnotationToken();
-
-      StmtResult AssociatedStmt = ParseStatement();
-      if (AssociatedStmt.isInvalid())
-        return StmtError();
-
-      // Allocate arrays in ASTContext.
-      Expr **ConditionsArray = nullptr;
-      OpenMPDirectiveKind *DirectiveKindsArray = nullptr;
-      if (!Conditions.empty()) {
-        ConditionsArray = new (ASTContext) Expr *[Conditions.size()];
-        std::copy(Conditions.begin(), Conditions.end(), ConditionsArray);
-
-        DirectiveKindsArray =
-            new (ASTContext) OpenMPDirectiveKind[DirectiveKinds.size()];
-        std::copy(DirectiveKinds.begin(), DirectiveKinds.end(),
-                  DirectiveKindsArray);
-      }
-      // Create OMPMetaDirective with runtime selection metadata.
-      SmallVector<OMPClause *, 1> Clauses;
-      Directive = Actions.OpenMP().ActOnOpenMPMetaDirective(
-          Clauses, AssociatedStmt.get(), Loc, EndLoc);
-
-      if (Directive.isUsable() && !Conditions.empty()) {
-        if (auto *MD = dyn_cast_or_null<OMPMetaDirective>(Directive.get())) {
-          ArrayRef<Expr *> CondsRef(ConditionsArray, Conditions.size());
-          ArrayRef<OpenMPDirectiveKind> KindsRef(DirectiveKindsArray,
-                                                 DirectiveKinds.size());
-          MD->setNonConstantUserConditions(CondsRef, KindsRef);
-        }
-      }
-
-      return Directive;
-    }
+    if (!NeedsRuntimeSelection) {
     std::function<void(StringRef)> DiagUnknownTrait =
         [this, Loc](StringRef ISATrait) {
           // TODO Track the selector locations in a way that is accessible here
@@ -2853,6 +2768,111 @@ StmtResult Parser::ParseOpenMPDeclarativeOrExecutableDirective(
       return StmtEmpty();
     }
     break;
+    }
+
+    // Runtime path: NeedsRuntimeSelection == true.
+    // For each clause, do a separate tentative parse to extract its
+    // sub-directive. This is needed because
+    // ParseOpenMPDeclarativeOrExecutableDirective consumes the pragma
+    // end on each call, so we can't parse multiple clauses in one
+    // linear pass.
+    SmallVector<Expr *, 4> Conditions;
+    SmallVector<Stmt *, 4> SubDirectives;
+
+    for (unsigned TargetIdx = 0; TargetIdx < TraitInfos.size(); ++TargetIdx) {
+      // Revert to the start of the clause list for each iteration.
+      TentativeParsingAction TPA2(*this);
+      BalancedDelimiterTracker T2(*this, tok::l_paren,
+                                  tok::annot_pragma_openmp_end);
+      unsigned Idx = 0;
+      Expr *Condition = nullptr;
+      Stmt *SubStmt = nullptr;
+
+      while (Tok.isNot(tok::annot_pragma_openmp_end)) {
+        if (Tok.isAnnotation())
+          break;
+        OpenMPClauseKind CKind = getOpenMPClauseKind(PP.getSpelling(Tok));
+        if (CKind == OMPC_unknown)
+          break;
+
+        SourceLocation ClauseLoc = ConsumeToken();
+        T2.consumeOpen();
+
+        if (Idx != TargetIdx) {
+          int paren = 0;
+          while (Tok.isNot(tok::r_paren) || paren != 0) {
+            if (Tok.is(tok::l_paren))
+              paren++;
+            if (Tok.is(tok::r_paren))
+              paren--;
+            if (Tok.is(tok::annot_pragma_openmp_end))
+              break;
+            ConsumeAnyToken();
+          }
+          if (Tok.is(tok::r_paren))
+            T2.consumeClose();
+          ++Idx;
+          continue;
+        }
+
+        // This is the target clause. Parse it fully.
+        if (CKind == OMPC_when) {
+          OMPTraitInfo &TI = Actions.getASTContext().getNewOMPTraitInfo();
+          parseOMPContextSelectors(ClauseLoc, TI);
+          TI.anyScoreOrCondition([&](Expr *&E, bool IsScore) {
+            if (!IsScore && E) {
+              Condition = E;
+              return true;
+            }
+            return false;
+          });
+          if (Tok.is(tok::colon))
+            ConsumeAnyToken();
+        }
+        // For 'otherwise'/'default', Condition stays nullptr.
+
+        if (Tok.is(tok::r_paren)) {
+          T2.consumeClose();
+          SubStmt = nullptr;
+        } else {
+          StmtResult SR = ParseOpenMPDeclarativeOrExecutableDirective(
+              StmtCtx, /*ReadDirectiveWithinMetadirective=*/true);
+          if (SR.isInvalid()) {
+            TPA2.Commit();
+            SkipUntil(tok::annot_pragma_openmp_end);
+            return StmtError();
+          }
+          SubStmt = SR.get();
+          if (isa_and_nonnull<NullStmt>(SubStmt))
+            SubStmt = nullptr;
+        }
+        break;
+      }
+
+      // Revert token stream for the next iteration.
+      TPA2.Revert();
+      Conditions.push_back(Condition);
+      SubDirectives.push_back(SubStmt);
+    }
+
+    // After all clauses parsed via tentative passes, consume pragma end once.
+    SkipUntil(tok::annot_pragma_openmp_end);
+    SourceLocation EndLoc;
+    if (Tok.is(tok::annot_pragma_openmp_end))
+      EndLoc = ConsumeAnnotationToken();
+    else
+      EndLoc = Loc;
+
+    StmtResult AssocStmt;
+    if (Tok.isNot(tok::r_brace) && Tok.isNot(tok::eof) &&
+        Tok.isNot(tok::annot_pragma_openmp) &&
+        Tok.isNot(tok::annot_attr_openmp)) {
+      AssocStmt = ParseStatement();
+    }
+    Directive = Actions.OpenMP().ActOnOpenMPMetaDirective(
+        /*Clauses=*/{}, /*AStmt=*/AssocStmt.get(), Loc, EndLoc, Conditions,
+        SubDirectives);
+    return Directive;
   }
   case OMPD_threadprivate: {
     // FIXME: Should this be permitted in C++?

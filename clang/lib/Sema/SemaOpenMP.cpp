@@ -7956,12 +7956,21 @@ setBranchProtectedScope(Sema &SemaRef, OpenMPDirectiveKind DKind, Stmt *AStmt) {
 StmtResult SemaOpenMP::ActOnOpenMPMetaDirective(ArrayRef<OMPClause *> Clauses,
                                                 Stmt *AStmt,
                                                 SourceLocation StartLoc,
-                                                SourceLocation EndLoc) {
-  if (!AStmt)
-    return StmtError();
+                                                SourceLocation EndLoc,
+                                                ArrayRef<Expr *> Conditions,
+                                                ArrayRef<Stmt *> Directives) {
+  assert(Conditions.size() == Directives.size() &&
+         "Conditions and Directives must have the same size");
+
+  // Determine if any condition is a non-constant runtime expression.
+  // If all conditions are constant (or this is a compile-time-only
+  // metadirective), IfStmt will already have been resolved by the caller
+  // and Conditions/Directives may be empty.
+  Stmt *IfStmt = Conditions.empty() ? AStmt : nullptr;
+  Stmt *AssocStmt = Conditions.empty() ? nullptr : AStmt;
 
   return OMPMetaDirective::Create(getASTContext(), StartLoc, EndLoc, Clauses,
-                                  AStmt, /*IfStmt=*/nullptr);
+                                  AssocStmt, IfStmt, Conditions, Directives);
 }
 
 StmtResult

@@ -6375,50 +6375,48 @@ public:
 class OMPMetaDirective final : public OMPExecutableDirective {
   friend class ASTStmtReader;
   friend class OMPExecutableDirective;
-  Stmt *IfStmt;
 
-  // Runtime selection support for non-constant user conditions.
-  // These fields store metadata for generating runtime if-else chains when
-  // user conditions cannot be evaluated at compile time.
-  bool HasNonConstantConditions = false;
-  unsigned NumConditions = 0;
-  Expr **Conditions = nullptr;
-  OpenMPDirectiveKind *DirectiveVariants = nullptr;
+  // Children layout: [IfStmt, Cond0, Dir0, Cond1, Dir1, ...]
+  // IfStmt: compile-time resolved directive (may be null for runtime-only)
+  // CondI: Expr* condition for variant I (null = 'otherwise')
+  // DirI:  OMPExecutableDirective* for variant I
+  unsigned NumVariants = 0;
 
-  OMPMetaDirective(SourceLocation StartLoc, SourceLocation EndLoc)
+  OMPMetaDirective(SourceLocation StartLoc, SourceLocation EndLoc,
+                   unsigned NumVariants)
       : OMPExecutableDirective(OMPMetaDirectiveClass,
-                               llvm::omp::OMPD_metadirective, StartLoc,
-                               EndLoc) {}
-  explicit OMPMetaDirective()
+                               llvm::omp::OMPD_metadirective, StartLoc, EndLoc),
+        NumVariants(NumVariants) {}
+
+  explicit OMPMetaDirective(unsigned NumVariants)
       : OMPExecutableDirective(OMPMetaDirectiveClass,
                                llvm::omp::OMPD_metadirective, SourceLocation(),
-                               SourceLocation()) {}
-
-  void setIfStmt(Stmt *S) { IfStmt = S; }
+                               SourceLocation()),
+        NumVariants(NumVariants) {}
 
 public:
-  static OMPMetaDirective *Create(const ASTContext &C, SourceLocation StartLoc,
-                                  SourceLocation EndLoc,
-                                  ArrayRef<OMPClause *> Clauses,
-                                  Stmt *AssociatedStmt, Stmt *IfStmt);
+  static OMPMetaDirective *
+  Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation EndLoc,
+         ArrayRef<OMPClause *> Clauses, Stmt *AssociatedStmt, Stmt *IfStmt,
+         ArrayRef<Expr *> Conditions,
+         ArrayRef<Stmt *> Directives);
+
   static OMPMetaDirective *CreateEmpty(const ASTContext &C, unsigned NumClauses,
-                                       EmptyShell);
-  Stmt *getIfStmt() const { return IfStmt; }
+                                       unsigned NumVariants, EmptyShell);
 
-  void setNonConstantUserConditions(ArrayRef<Expr *> Conds,
-                                    ArrayRef<OpenMPDirectiveKind> Variants) {
-    HasNonConstantConditions = true;
-    NumConditions = Conds.size();
-    Conditions = const_cast<Expr **>(Conds.data());
-    DirectiveVariants = const_cast<OpenMPDirectiveKind *>(Variants.data());
+  Stmt *getIfStmt() const { return Data->getChildren()[0]; }
+  void setIfStmt(Stmt *S) { Data->getChildren()[0] = S; }
+
+  unsigned getNumVariants() const { return NumVariants; }
+
+  Expr *getVariantCondition(unsigned I) const {
+    assert(I < NumVariants);
+    return cast_or_null<Expr>(Data->getChildren()[1 + 2 * I]);
   }
 
-  bool hasNonConstantConditions() const { return HasNonConstantConditions; }
-  ArrayRef<Expr *> getConditions() const {
-    return llvm::ArrayRef(Conditions, NumConditions);
-  }
-  ArrayRef<OpenMPDirectiveKind> getDirectiveVariants() const {
-    return llvm::ArrayRef(DirectiveVariants, NumConditions);
+  OMPExecutableDirective *getVariantDirective(unsigned I) const {
+    assert(I < NumVariants);
+    return cast_or_null<OMPExecutableDirective>(Data->getChildren()[2 + 2 * I]);
   }
 
   static bool classof(const Stmt *T) {
