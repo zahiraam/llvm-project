@@ -260,12 +260,10 @@ void OMPLoopDirective::setFinalsConditions(ArrayRef<Expr *> A) {
   llvm::copy(A, getFinalsConditions().begin());
 }
 
-OMPMetaDirective *
-OMPMetaDirective::Create(const ASTContext &C, SourceLocation StartLoc,
-                         SourceLocation EndLoc, ArrayRef<OMPClause *> Clauses,
-                         Stmt *AssociatedStmt, Stmt *IfStmt,
-                         ArrayRef<Expr *> Conditions,
-                         ArrayRef<Stmt *> Directives) {
+OMPMetaDirective *OMPMetaDirective::Create(
+    const ASTContext &C, SourceLocation StartLoc, SourceLocation EndLoc,
+    ArrayRef<OMPClause *> Clauses, Stmt *AssociatedStmt, Stmt *IfStmt,
+    ArrayRef<Expr *> Conditions, ArrayRef<Stmt *> Directives) {
   assert(Conditions.size() == Directives.size());
   unsigned NumVariants = Conditions.size();
   auto *Dir = createDirective<OMPMetaDirective>(
@@ -286,8 +284,7 @@ OMPMetaDirective *OMPMetaDirective::CreateEmpty(const ASTContext &C,
   return createEmptyDirective<OMPMetaDirective>(
       C, NumClauses,
       /*HasAssociatedStmt=*/false,
-      /*NumChildren=*/1 + 2 * NumVariants,
-      NumVariants);
+      /*NumChildren=*/1 + 2 * NumVariants, NumVariants);
 }
 
 OMPParallelDirective *OMPParallelDirective::Create(

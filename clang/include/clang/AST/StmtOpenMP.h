@@ -6398,8 +6398,7 @@ public:
   static OMPMetaDirective *
   Create(const ASTContext &C, SourceLocation StartLoc, SourceLocation EndLoc,
          ArrayRef<OMPClause *> Clauses, Stmt *AssociatedStmt, Stmt *IfStmt,
-         ArrayRef<Expr *> Conditions,
-         ArrayRef<Stmt *> Directives);
+         ArrayRef<Expr *> Conditions, ArrayRef<Stmt *> Directives);
 
   static OMPMetaDirective *CreateEmpty(const ASTContext &C, unsigned NumClauses,
                                        unsigned NumVariants, EmptyShell);

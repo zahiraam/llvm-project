@@ -2672,102 +2672,102 @@ StmtResult Parser::ParseOpenMPDeclarativeOrExecutableDirective(
     // End of the first iteration. Parser is reset to the start of metadirective
 
     // Detect non-constant user conditions.
-    bool NeedsRuntimeSelection  = false;
+    bool NeedsRuntimeSelection = false;
     for (unsigned I = 0; I < TraitInfos.size(); ++I) {
       if (ClauseKinds[I] != OMPC_when)
         continue;
       TraitInfos[I]->anyScoreOrCondition([&](Expr *&E, bool IsScore) {
         if (!IsScore && E && !E->isIntegerConstantExpr(ASTContext)) {
-          NeedsRuntimeSelection  = true;
+          NeedsRuntimeSelection = true;
           return true;
         }
         return false;
       });
-      if (NeedsRuntimeSelection )
+      if (NeedsRuntimeSelection)
         break;
     }
 
     if (!NeedsRuntimeSelection) {
-    std::function<void(StringRef)> DiagUnknownTrait =
-        [this, Loc](StringRef ISATrait) {
-          // TODO Track the selector locations in a way that is accessible here
-          // to improve the diagnostic location.
-          Diag(Loc, diag::warn_unknown_declare_variant_isa_trait) << ISATrait;
-        };
-    TargetOMPContext OMPCtx(ASTContext, std::move(DiagUnknownTrait),
-                            /* CurrentFunctionDecl */ nullptr,
-                            ArrayRef<llvm::omp::TraitProperty>(),
-                            Actions.OpenMP().getOpenMPDeviceNum());
+      std::function<void(StringRef)> DiagUnknownTrait =
+          [this, Loc](StringRef ISATrait) {
+            // TODO Track the selector locations in a way that is accessible
+            // here to improve the diagnostic location.
+            Diag(Loc, diag::warn_unknown_declare_variant_isa_trait) << ISATrait;
+          };
+      TargetOMPContext OMPCtx(ASTContext, std::move(DiagUnknownTrait),
+                              /* CurrentFunctionDecl */ nullptr,
+                              ArrayRef<llvm::omp::TraitProperty>(),
+                              Actions.OpenMP().getOpenMPDeviceNum());
 
-    // A single match is returned for OpenMP 5.0
-    int BestIdx = getBestVariantMatchForContext(VMIs, OMPCtx);
+      // A single match is returned for OpenMP 5.0
+      int BestIdx = getBestVariantMatchForContext(VMIs, OMPCtx);
 
-    int Idx = 0;
-    // In OpenMP 5.0 metadirective is either replaced by another directive or
-    // ignored.
-    // TODO: In OpenMP 5.1 generate multiple directives based upon the matches
-    // found by getBestWhenMatchForContext.
-    while (Tok.isNot(tok::annot_pragma_openmp_end)) {
-      // OpenMP 5.0 implementation - Skip to the best index found.
-      if (Idx++ != BestIdx) {
-        ConsumeToken();  // Consume clause name
-        T.consumeOpen(); // Consume '('
-        int paren = 0;
-        // Skip everything inside the clause
-        while (Tok.isNot(tok::r_paren) || paren != 0) {
-          if (Tok.is(tok::l_paren))
-            paren++;
+      int Idx = 0;
+      // In OpenMP 5.0 metadirective is either replaced by another directive or
+      // ignored.
+      // TODO: In OpenMP 5.1 generate multiple directives based upon the matches
+      // found by getBestWhenMatchForContext.
+      while (Tok.isNot(tok::annot_pragma_openmp_end)) {
+        // OpenMP 5.0 implementation - Skip to the best index found.
+        if (Idx++ != BestIdx) {
+          ConsumeToken();  // Consume clause name
+          T.consumeOpen(); // Consume '('
+          int paren = 0;
+          // Skip everything inside the clause
+          while (Tok.isNot(tok::r_paren) || paren != 0) {
+            if (Tok.is(tok::l_paren))
+              paren++;
+            if (Tok.is(tok::r_paren))
+             paren--;
+            ConsumeAnyToken();
+          }
+          // Parse ')'
           if (Tok.is(tok::r_paren))
-            paren--;
+            T.consumeClose();
+          continue;
+        }
+
+        OpenMPClauseKind CKind = Tok.isAnnotation()
+                                     ? OMPC_unknown
+                                     : getOpenMPClauseKind(PP.getSpelling(Tok));
+        SourceLocation Loc = ConsumeToken();
+
+        // Parse '('.
+        T.consumeOpen();
+
+        // Skip ContextSelectors for when clause
+        if (CKind == OMPC_when) {
+          OMPTraitInfo &TI = Actions.getASTContext().getNewOMPTraitInfo();
+          // parse and skip the ContextSelectors
+          parseOMPContextSelectors(Loc, TI);
+
+          // Parse ':'
           ConsumeAnyToken();
         }
-        // Parse ')'
-        if (Tok.is(tok::r_paren))
-          T.consumeClose();
-        continue;
+
+        // If no directive is passed, skip in OpenMP 5.0.
+        // TODO: Generate nothing directive from OpenMP 5.1.
+        if (Tok.is(tok::r_paren)) {
+          SkipUntil(tok::annot_pragma_openmp_end);
+              break;
+          }
+
+         // Parse Directive
+          Directive = ParseOpenMPDeclarativeOrExecutableDirective(
+              StmtCtx,
+              /*ReadDirectiveWithinMetadirective=*/true);
+          break;
       }
-
-      OpenMPClauseKind CKind = Tok.isAnnotation()
-                                   ? OMPC_unknown
-                                   : getOpenMPClauseKind(PP.getSpelling(Tok));
-      SourceLocation Loc = ConsumeToken();
-
-      // Parse '('.
-      T.consumeOpen();
-
-      // Skip ContextSelectors for when clause
-      if (CKind == OMPC_when) {
-        OMPTraitInfo &TI = Actions.getASTContext().getNewOMPTraitInfo();
-        // parse and skip the ContextSelectors
-        parseOMPContextSelectors(Loc, TI);
-
-        // Parse ':'
-        ConsumeAnyToken();
+      // If no match is found and no otherwise clause is present, skip
+      // OMP5.2 Chapter 7.4: If no otherwise clause is specified the effect is as
+      // if one was specified without an associated directive variant.
+      if (BestIdx == -1 && Idx > 0) {
+        assert(Tok.is(tok::annot_pragma_openmp_end) &&
+               "Expecting the end of the pragma here");
+        ConsumeAnnotationToken();
+        return StmtEmpty();
       }
-
-      // If no directive is passed, skip in OpenMP 5.0.
-      // TODO: Generate nothing directive from OpenMP 5.1.
-      if (Tok.is(tok::r_paren)) {
-        SkipUntil(tok::annot_pragma_openmp_end);
-        break;
-      }
-
-      // Parse Directive
-      Directive = ParseOpenMPDeclarativeOrExecutableDirective(
-          StmtCtx,
-          /*ReadDirectiveWithinMetadirective=*/true);
       break;
-    }
-    // If no match is found and no otherwise clause is present, skip
-    // OMP5.2 Chapter 7.4: If no otherwise clause is specified the effect is as
-    // if one was specified without an associated directive variant.
-    if (BestIdx == -1 && Idx > 0) {
-      assert(Tok.is(tok::annot_pragma_openmp_end) &&
-             "Expecting the end of the pragma here");
-      ConsumeAnnotationToken();
-      return StmtEmpty();
-    }
-    break;
     }
 
     // Runtime path: NeedsRuntimeSelection == true.
