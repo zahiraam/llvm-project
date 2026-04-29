@@ -615,9 +615,10 @@ OpenMP Support
 - Added support for ``transparent`` clause in task and taskloop directives.
 - Added support for ``use_device_ptr`` clause to accept an optional
   ``fallback`` modifier (``fb_nullify`` or ``fb_preserve``) with OpenMP >= 61.
-- Added support for capturing structured bindings. Variables introduced by
-  decomposition declarations are now handled correctly when captured inside
-  OpenMP constructs.
+- Added support for C++17 structured bindings in OpenMP regions. Structured
+  bindings from structs, classes, and arrays can now be used inside
+  OpenMP directives. Note: Tuple-like bindings (types using the tuple protocol
+  with ``get<N>()``) are not yet supported and will produce a compilation error.
 
 Improvements
 ^^^^^^^^^^^^
